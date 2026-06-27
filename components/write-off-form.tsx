@@ -10,12 +10,15 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { StorePicker } from "@/components/store-picker"
+import { VoiceCommentButton } from "@/components/voice-comment-button"
 import { ImagePlus, Loader2, X } from "lucide-react"
 import { toast } from "sonner"
 
 export function WriteOffForm() {
   const [type, setType] = useState("no_deduction")
   const [storeLocation, setStoreLocation] = useState("")
+  const [comment, setComment] = useState("")
+  const commentBaseRef = useRef("")
   const [photoUrl, setPhotoUrl] = useState<string>("")
   const [uploading, setUploading] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -56,6 +59,8 @@ export function WriteOffForm() {
         formRef.current?.reset()
         setType("no_deduction")
         setStoreLocation("")
+        setComment("")
+        commentBaseRef.current = ""
         setPhotoUrl("")
       }
     })
@@ -147,14 +152,30 @@ export function WriteOffForm() {
           )}
 
           <div className="grid gap-2">
-            <Label htmlFor="comment">Comment</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="comment">Comment</Label>
+              <VoiceCommentButton
+                onTranscript={(text) => {
+                  const base = commentBaseRef.current
+                  setComment(base ? `${base} ${text}` : text)
+                }}
+              />
+            </div>
             <Textarea
               id="comment"
               name="comment"
               required
-              placeholder="Describe the item, reason for write-off, and any context..."
+              value={comment}
+              onChange={(e) => {
+                setComment(e.target.value)
+                commentBaseRef.current = e.target.value
+              }}
+              placeholder="Describe the item, reason for write-off, or tap the mic to dictate..."
               rows={3}
             />
+            <p className="text-xs text-muted-foreground">
+              Tap the mic for hands-free voice-to-text dictation.
+            </p>
           </div>
 
           <Button type="submit" disabled={isPending || uploading}>
