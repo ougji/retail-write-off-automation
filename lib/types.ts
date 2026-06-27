@@ -1,6 +1,6 @@
-export type WriteOffStatus = "pending" | "approved" | "rejected"
+export type WriteOffStatus = "pending" | "verified" | "approved" | "rejected"
 export type WriteOffType = "no_deduction" | "with_deduction"
-export type UserRole = "employee" | "reviewer"
+export type UserRole = "line_staff" | "supervisor" | "control"
 
 export interface WriteOff {
   id: string
@@ -12,10 +12,41 @@ export interface WriteOff {
   deduct_employee: string | null
   comment: string
   status: WriteOffStatus
+  verified_by: string | null
+  verified_at: string | null
   reviewer_id: string | null
   reviewed_at: string | null
   created_at: string
 }
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  line_staff: "Line Staff",
+  supervisor: "Supervisor",
+  control: "Control Department",
+}
+
+// Normalizes raw metadata role values (incl. legacy employee/reviewer) to a UserRole.
+export function normalizeRole(raw?: string | null): UserRole {
+  if (raw === "supervisor") return "supervisor"
+  if (raw === "control" || raw === "reviewer") return "control"
+  return "line_staff"
+}
+
+export const MIN_COMMENT_LENGTH = 10
+
+// Employee codes a supervisor can assign a deduction to (iiko personnel codes).
+export const EMPLOYEE_CODES = [
+  { code: "EMP-1042", name: "Айгерим Сапарова" },
+  { code: "EMP-1087", name: "Данияр Ахметов" },
+  { code: "EMP-1103", name: "Жанна Оспанова" },
+  { code: "EMP-1156", name: "Бекзат Нурланов" },
+  { code: "EMP-1198", name: "Мадина Қайратқызы" },
+  { code: "EMP-1234", name: "Тимур Серіков" },
+  { code: "EMP-1276", name: "Аружан Болатова" },
+  { code: "EMP-1310", name: "Ерлан Жұмабеков" },
+  { code: "EMP-1355", name: "Камила Тлеубергенова" },
+  { code: "EMP-1402", name: "Нұрсұлтан Әбеуов" },
+] as const
 
 export interface Store {
   id: string
@@ -68,7 +99,7 @@ export const STORES: Store[] = [
   { id: "75c3c721", name: "Bahandi Апорт", address: "Ташкентский тракт, 17к (ТРЦ Молл Апорт, 2 этаж)", city: "Алматы" },
   { id: "7c724281", name: "Bahandi Даймонд Плаза", address: "проспект Нурсултана Назарбаева, 177Б (ТРК Diamond plaza, 4 этаж)", city: "Шымкент" },
   { id: "816344dc", name: "Bahandi Байтурсынова", address: "ул. Байтурсынова, 61 (1 этаж)", city: "Алматы" },
-  { id: "820ee7d8", name: "Bahandi ЦУМ Кар", address: "проспект Бухар Жырау, 53/8 (ТЦ ЦУМ, 3 этаж)", city: "Караганда" },
+  { id: "820ee7d8", name: "Bahandi ЦУМ Кар", address: "проспект Бухар Жырау, 53/8 (ТЦ ЦУМ, 3 этаж)", city: "Карага��да" },
   { id: "82e58b56", name: "Bahandi Гагарина", address: "проспект Гагарина, 41 (1 этаж)", city: "Алматы" },
   { id: "8ba0316b", name: "Bahandi Дала Молл", address: "Алматинская трасса, 13а (ТЦ Dala Mall, 2 этаж)", city: "Шымкент" },
   { id: "8c3a9781", name: "Bahandi Магнум Бесагаш", address: "Медеуский район, ул. Халиуллина, 194/3 (киоск)", city: "Алматы" },

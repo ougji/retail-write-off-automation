@@ -3,9 +3,9 @@
 import { useRef, useState, useTransition } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { submitWriteOff } from "@/app/actions"
+import { MIN_COMMENT_LENGTH } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -145,10 +145,9 @@ export function WriteOffForm() {
           </div>
 
           {type === "with_deduction" && (
-            <div className="grid gap-2">
-              <Label htmlFor="deduct_employee">Employee to deduct from</Label>
-              <Input id="deduct_employee" name="deduct_employee" placeholder="Employee name" />
-            </div>
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Your supervisor will assign the specific employee code to be penalized during verification.
+            </p>
           )}
 
           <div className="grid gap-2">
@@ -165,6 +164,7 @@ export function WriteOffForm() {
               id="comment"
               name="comment"
               required
+              minLength={MIN_COMMENT_LENGTH}
               value={comment}
               onChange={(e) => {
                 setComment(e.target.value)
@@ -174,7 +174,9 @@ export function WriteOffForm() {
               rows={3}
             />
             <p className="text-xs text-muted-foreground">
-              Tap the mic for hands-free voice-to-text dictation.
+              {comment.trim().length < MIN_COMMENT_LENGTH
+                ? `At least ${MIN_COMMENT_LENGTH} characters (${comment.trim().length}/${MIN_COMMENT_LENGTH}). Tap the mic to dictate.`
+                : "Looks good. Tap the mic for hands-free dictation."}
             </p>
           </div>
 

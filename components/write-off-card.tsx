@@ -1,11 +1,14 @@
 "use client"
 
 import type { WriteOff } from "@/lib/types"
+import { EMPLOYEE_CODES } from "@/lib/types"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StatusBadge } from "@/components/status-badge"
-import { reviewWriteOff } from "@/app/actions"
-import { Check, MapPin, User, UserMinus, X } from "lucide-react"
+import { approveWriteOff, rejectWriteOff, verifyWriteOff } from "@/app/actions"
+import { Check, MapPin, ShieldCheck, User, UserMinus, X } from "lucide-react"
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
 
@@ -18,22 +21,51 @@ function formatDate(iso: string) {
   })
 }
 
-export function WriteOffCard({ writeOff, canReview }: { writeOff: WriteOff; canReview?: boolean }) {
-  const [isPending, startTransition] = useTransition()
-  const [action, setAction] = useState<"approved" | "rejected" | null>(null)
+type ReviewMode = "supervisor" | "control"
 
-  const handleReview = (decision: "approved" | "rejected") => {
-    setAction(decision)
+export function WriteOffCard({ writeOff, mode }: { writeOff: WriteOff; mode?: ReviewMode }) {
+  const [isPending, startTransition] = useTransition()
+  const [busy, setBusy] = useState<"primary" | "reject" | null>(null)
+  const [deductCode, setDeductCode] = useState("")
+
+  const needsCode = writeOff.write_off_type === "with_deduction"
+
+  const handleVerify = () => {
+    if (needsCode && !deductCode) {
+      toast.error("Select an employee code to penalize first.")
+      return
+    }
+    setBusy("primary")
     startTransition(async () => {
-      const res = await reviewWriteOff(writeOff.id, decision)
-      if (res?.error) {
-        toast.error(res.error)
-      } else {
-        toast.success(`Write-off ${decision}.`)
-      }
-      setAction(null)
+      const res = await verifyWriteOff(writeOff.id, deductCode || undefined)
+      if (res?.error) toast.error(res.error)
+      else toast.success("Request verified and sent to Control.")
+      setBusy(null)
     })
   }
+
+  const handleApprove = () => {
+    setBusy("primary")
+    startTransition(async () => {
+      const res = await approveWriteOff(writeOff.id)
+      if (res?.error) toast.error(res.error)
+      else toast.success("Synced: Data sent to Iiko")
+      setBusy(null)
+    })
+  }
+
+  const handleReject = () => {
+    setBusy("reject")
+    startTransition(async () => {
+      const res = await rejectWriteOff(writeOff.id)
+      if (res?.error) toast.error(res.error)
+      else toast.success("Request rejected.")
+      setBusy(null)
+    })
+  }
+
+  const showSupervisorActions = mode === "supervisor" && writeOff.status === "pending"
+  const showControlActions = mode === "control" && writeOff.status === "verified"
 
   return (
     <Card className="overflow-hidden">
@@ -59,10 +91,10 @@ export function WriteOffCard({ writeOff, canReview }: { writeOff: WriteOff; canR
                 {writeOff.employee_name}
               </div>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <MapPin className="h-3.5 w-3.5" />
-                {writeOff.store_location}
+                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{writeOff.store_location}</span>
                 <span aria-hidden="true">·</span>
-                {formatDate(writeOff.created_at)}
+                <span className="shrink-0">{formatDate(writeOff.created_at)}</span>
               </div>
             </div>
             <StatusBadge status={writeOff.status} />
@@ -70,32 +102,75 @@ export function WriteOffCard({ writeOff, canReview }: { writeOff: WriteOff; canR
 
           <p className="text-sm leading-relaxed text-pretty">{writeOff.comment}</p>
 
-          {writeOff.write_off_type === "with_deduction" && writeOff.deduct_employee && (
+          {needsCode && writeOff.deduct_employee && (
             <div className="flex w-fit items-center gap-1.5 rounded-md bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">
               <UserMinus className="h-3.5 w-3.5" />
               Deduct from: {writeOff.deduct_employee}
             </div>
           )}
 
-          {canReview && writeOff.status === "pending" && (
+          {needsCode && !writeOff.deduct_employee && (
+            <div className="flex w-fit items-center gap-1.5 rounded-md bg-chart-2/10 px-2 py-1 text-xs font-medium text-chart-2">
+              <UserMinus className="h-3.5 w-3.5" />
+              Deduction pending assignment
+            </div>
+          )}
+
+          {/* Supervisor: assign employee code (only for with_deduction) then Verify */}
+          {showSupervisorActions && needsCode && (
+            <div className="grid gap-1.5">
+              <Label htmlFor={`deduct-${writeOff.id}`} className="text-xs text-muted-foreground">
+                Assign employee code to penalize
+              </Label>
+              <Select value={deductCode} onValueChange={setDeductCode}>
+                <SelectTrigger id={`deduct-${writeOff.id}`} className="w-full">
+                  <SelectValue placeholder="Select employee code" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EMPLOYEE_CODES.map((e) => (
+                    <SelectItem key={e.code} value={`${e.code} · ${e.name}`}>
+                      {e.code} · {e.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {showSupervisorActions && (
             <div className="mt-auto flex gap-2 pt-1">
-              <Button
-                size="sm"
-                onClick={() => handleReview("approved")}
-                disabled={isPending}
-              >
-                <Check className="h-4 w-4" />
-                {action === "approved" ? "Approving..." : "Approve"}
+              <Button size="sm" onClick={handleVerify} disabled={isPending}>
+                <ShieldCheck className="h-4 w-4" />
+                {busy === "primary" ? "Verifying..." : "Verify"}
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleReview("rejected")}
+                onClick={handleReject}
                 disabled={isPending}
                 className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
                 <X className="h-4 w-4" />
-                {action === "rejected" ? "Rejecting..." : "Reject"}
+                {busy === "reject" ? "Rejecting..." : "Reject"}
+              </Button>
+            </div>
+          )}
+
+          {showControlActions && (
+            <div className="mt-auto flex gap-2 pt-1">
+              <Button size="sm" onClick={handleApprove} disabled={isPending}>
+                <Check className="h-4 w-4" />
+                {busy === "primary" ? "Syncing..." : "Approve & Sync"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleReject}
+                disabled={isPending}
+                className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <X className="h-4 w-4" />
+                {busy === "reject" ? "Rejecting..." : "Reject"}
               </Button>
             </div>
           )}

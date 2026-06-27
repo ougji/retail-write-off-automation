@@ -1,13 +1,18 @@
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { WriteOffStatus } from "@/lib/types"
-import { CheckCircle2, Clock, XCircle } from "lucide-react"
+import { CheckCircle2, Clock, ShieldCheck, XCircle } from "lucide-react"
 
 const config: Record<WriteOffStatus, { label: string; className: string; icon: typeof Clock }> = {
   pending: {
     label: "Pending",
     className: "border-chart-2/30 bg-chart-2/10 text-chart-2",
     icon: Clock,
+  },
+  verified: {
+    label: "Verified",
+    className: "border-chart-4/40 bg-chart-4/10 text-chart-4",
+    icon: ShieldCheck,
   },
   approved: {
     label: "Approved",
