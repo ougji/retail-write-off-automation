@@ -13,14 +13,20 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ImagePlus, Loader2, X } from "lucide-react"
 import { toast } from "sonner"
+import { VoiceCommentButton } from "@/components/voice-comment-button"
 
 export function WriteOffForm() {
   const [type, setType] = useState("no_deduction")
   const [photoUrl, setPhotoUrl] = useState<string>("")
+  const [comment, setComment] = useState("")
   const [uploading, setUploading] = useState(false)
   const [isPending, startTransition] = useTransition()
   const formRef = useRef<HTMLFormElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const handleVoiceTranscript = (text: string) => {
+    setComment((prev) => (prev ? `${prev} ${text}` : text))
+  }
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -55,6 +61,7 @@ export function WriteOffForm() {
         formRef.current?.reset()
         setType("no_deduction")
         setPhotoUrl("")
+        setComment("")
       }
     })
   }
@@ -155,12 +162,29 @@ export function WriteOffForm() {
             </div>
           )}
 
-          <div className="grid gap-2">
+          <div className="grid gap-3">
             <Label htmlFor="comment">Comment</Label>
+
+            {/* Voice input row */}
+            <div className="flex items-start gap-4 rounded-xl border border-dashed border-primary/40 bg-primary/5 p-4">
+              <VoiceCommentButton
+                onTranscript={handleVoiceTranscript}
+                disabled={isPending}
+              />
+              <div className="flex flex-col gap-1 pt-1 min-w-0">
+                <p className="text-sm font-medium leading-none">Hands-free comment</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Tap the mic, describe the item and reason, then tap again to stop. Your speech will be transcribed automatically.
+                </p>
+              </div>
+            </div>
+
             <Textarea
               id="comment"
               name="comment"
               required
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
               placeholder="Describe the item, reason for write-off, and any context..."
               rows={3}
             />
