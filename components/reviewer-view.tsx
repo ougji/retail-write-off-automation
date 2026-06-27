@@ -3,16 +3,28 @@
 import { useState } from "react"
 import type { WriteOff, WriteOffStatus } from "@/lib/types"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
 import { WriteOffCard } from "@/components/write-off-card"
 import { StatCards } from "@/components/stat-cards"
-import { Inbox } from "lucide-react"
+import { Inbox, Search } from "lucide-react"
 
 type Filter = "all" | WriteOffStatus
 
 export function ReviewerView({ writeOffs }: { writeOffs: WriteOff[] }) {
   const [filter, setFilter] = useState<Filter>("pending")
+  const [query, setQuery] = useState("")
 
-  const filtered = filter === "all" ? writeOffs : writeOffs.filter((w) => w.status === filter)
+  const byStatus = filter === "all" ? writeOffs : writeOffs.filter((w) => w.status === filter)
+
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? byStatus.filter((w) =>
+        [w.store_location, w.employee_name, w.comment, w.deduct_employee ?? ""]
+          .join(" ")
+          .toLowerCase()
+          .includes(q),
+      )
+    : byStatus
 
   return (
     <div className="flex flex-col gap-6">
@@ -23,14 +35,25 @@ export function ReviewerView({ writeOffs }: { writeOffs: WriteOff[] }) {
 
       <StatCards writeOffs={writeOffs} />
 
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
-        <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-          <TabsTrigger value="approved">Approved</TabsTrigger>
-          <TabsTrigger value="rejected">Rejected</TabsTrigger>
-          <TabsTrigger value="all">All</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
+          <TabsList className="w-full justify-start overflow-x-auto">
+            <TabsTrigger value="pending">Pending</TabsTrigger>
+            <TabsTrigger value="approved">Approved</TabsTrigger>
+            <TabsTrigger value="rejected">Rejected</TabsTrigger>
+            <TabsTrigger value="all">All</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="relative sm:w-72">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search store, employee, or note..."
+            className="pl-9"
+          />
+        </div>
+      </div>
 
       {filtered.length === 0 ? (
         <EmptyState />

@@ -3,19 +3,19 @@
 import { useRef, useState, useTransition } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { submitWriteOff } from "@/app/actions"
-import { STORE_LOCATIONS } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { StorePicker } from "@/components/store-picker"
 import { ImagePlus, Loader2, X } from "lucide-react"
 import { toast } from "sonner"
 
 export function WriteOffForm() {
   const [type, setType] = useState("no_deduction")
+  const [storeLocation, setStoreLocation] = useState("")
   const [photoUrl, setPhotoUrl] = useState<string>("")
   const [uploading, setUploading] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -45,6 +45,7 @@ export function WriteOffForm() {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
     formData.set("write_off_type", type)
+    formData.set("store_location", storeLocation)
     formData.set("photo", photoUrl)
     startTransition(async () => {
       const res = await submitWriteOff(formData)
@@ -54,6 +55,7 @@ export function WriteOffForm() {
         toast.success("Write-off submitted for review.")
         formRef.current?.reset()
         setType("no_deduction")
+        setStoreLocation("")
         setPhotoUrl("")
       }
     })
@@ -68,18 +70,7 @@ export function WriteOffForm() {
         <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-5">
           <div className="grid gap-2">
             <Label htmlFor="store_location">Store location</Label>
-            <Select name="store_location" required>
-              <SelectTrigger id="store_location">
-                <SelectValue placeholder="Select a store" />
-              </SelectTrigger>
-              <SelectContent>
-                {STORE_LOCATIONS.map((loc) => (
-                  <SelectItem key={loc} value={loc}>
-                    {loc}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <StorePicker value={storeLocation} onChange={setStoreLocation} />
           </div>
 
           <div className="grid gap-2">
