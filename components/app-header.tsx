@@ -1,46 +1,26 @@
 "use client"
 
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { LogOut, PackageX } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { ROLE_LABELS, type Role } from "@/lib/types"
+import { ClipboardCheck, LogOut } from "lucide-react"
 
-export function AppHeader({ name, role }: { name: string; role: string }) {
-  const router = useRouter()
-
-  const signOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push("/auth/login")
-    router.refresh()
-  }
-
+export function AppHeader({ role, onLogout }: { role: Role; onLogout: () => void }) {
   return (
-    <header className="sticky top-0 z-10 border-b border-sidebar-border bg-sidebar text-sidebar-foreground">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 md:px-6">
-        <div className="flex items-center gap-2">
-          <PackageX className="h-6 w-6 text-primary" />
-          <span className="text-base font-semibold tracking-tight">WriteOff</span>
-          <Badge
-            variant="secondary"
-            className="ml-1 capitalize bg-sidebar-accent text-sidebar-accent-foreground"
-          >
-            {role}
-          </Badge>
+    <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur">
+      <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <ClipboardCheck className="size-4" />
+          </span>
+          <div className="leading-tight">
+            <p className="text-sm font-semibold">WriteOff Control</p>
+            <p className="text-xs text-muted-foreground">{ROLE_LABELS[role]}</p>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden text-sm text-sidebar-foreground/70 sm:inline">{name}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={signOut}
-            className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="ml-1.5 hidden sm:inline">Sign out</span>
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={onLogout} className="gap-1.5">
+          <LogOut className="size-4" />
+          Log Out
+        </Button>
       </div>
     </header>
   )

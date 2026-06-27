@@ -1,32 +1,22 @@
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import type { WriteOffStatus } from "@/lib/types"
-import { CheckCircle2, Clock, XCircle } from "lucide-react"
+import { STATUS_META, type WriteOffStatus } from "@/lib/types"
+import { CheckCircle2, Clock, ShieldCheck, XCircle } from "lucide-react"
 
-const config: Record<WriteOffStatus, { label: string; className: string; icon: typeof Clock }> = {
-  pending: {
-    label: "Pending",
-    className: "border-chart-2/30 bg-chart-2/10 text-chart-2",
-    icon: Clock,
-  },
-  approved: {
-    label: "Approved",
-    className: "border-primary/30 bg-primary/10 text-primary",
-    icon: CheckCircle2,
-  },
-  rejected: {
-    label: "Rejected",
-    className: "border-destructive/30 bg-destructive/10 text-destructive",
-    icon: XCircle,
-  },
+const icons: Record<WriteOffStatus, typeof Clock> = {
+  pending: Clock,
+  verified: ShieldCheck,
+  approved: CheckCircle2,
+  rejected: XCircle,
 }
 
 export function StatusBadge({ status }: { status: WriteOffStatus }) {
-  const { label, className, icon: Icon } = config[status]
+  const meta = STATUS_META[status]
+  const Icon = icons[status]
   return (
-    <Badge variant="outline" className={cn("gap-1 font-medium", className)}>
+    <Badge variant="outline" className={cn("gap-1 font-medium", meta.className)}>
       <Icon className="h-3.5 w-3.5" />
-      {label}
+      {meta.label}
     </Badge>
   )
 }
