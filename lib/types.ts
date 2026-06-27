@@ -1,7 +1,6 @@
 export type Role = "line_staff" | "supervisor" | "control"
 
 export type WriteOffStatus = "pending" | "verified" | "approved" | "rejected"
-export type WriteOffType = "no_deduction" | "with_deduction"
 
 export interface Ingredient {
   id: string
@@ -11,16 +10,23 @@ export interface Ingredient {
 
 export interface WriteOff {
   id: string
-  store_location: string
-  photo: string | null
-  write_off_type: WriteOffType
+  userId: string
+  submitterName: string
+  storeId: string
+  storeName: string
+  storeAddress: string | null
+  reason: string
   comment: string
-  ingredients: Ingredient[]
-  submitted_by: string
-  responsible_employee: string | null
-  estimated_cost: number
+  withDeduction: boolean
+  responsiblePersonId: string | null
+  responsiblePersonName: string | null
+  items: Ingredient[]
+  photoDataUrl: string | null
+  totalValue: number
   status: WriteOffStatus
-  created_at: string
+  verifiedBy: string | null
+  decisionBy: string | null
+  createdAt: string
 }
 
 export const ROLES: { value: Role; label: string; subtitle: string }[] = [
@@ -35,28 +41,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   control: "Control Department",
 }
 
-export const STORE_LOCATIONS = [
-  "Downtown Flagship",
-  "Westfield Mall",
-  "Northside Plaza",
-  "Eastgate Center",
-  "Harbor Point",
-  "Airport Terminal",
-] as const
-
-export const EMPLOYEES = [
-  "Alex Rivera",
-  "Jordan Chen",
-  "Sam Patel",
-  "Taylor Brooks",
-  "Morgan Lee",
-  "Casey Nguyen",
-] as const
-
-export const STATUS_META: Record<
-  WriteOffStatus,
-  { label: string; className: string }
-> = {
+export const STATUS_META: Record<WriteOffStatus, { label: string; className: string }> = {
   pending: {
     label: "Pending",
     className: "bg-chart-2/15 text-chart-2 border-chart-2/30",

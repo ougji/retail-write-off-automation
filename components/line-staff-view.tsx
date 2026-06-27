@@ -8,40 +8,38 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { StatusBadge } from "@/components/status-badge"
-import { useStore } from "@/lib/store"
-import { STORE_LOCATIONS, type Ingredient, type WriteOffType } from "@/lib/types"
+import { StorePicker } from "@/components/store-picker"
+import { PersonPicker } from "@/components/person-picker"
+import { useWriteOffs } from "@/lib/use-write-offs"
+import { createWriteOff } from "@/app/actions/write-offs"
+import type { Ingredient } from "@/lib/types"
+import type { Store } from "@/lib/stores"
+import type { Person } from "@/lib/people"
 import { ImagePlus, Plus, Trash2, X } from "lucide-react"
-
-const STAFF_NAME = "Jordan Chen"
 
 function uid() {
   return Math.random().toString(36).slice(2, 10)
 }
 
 export function LineStaffView() {
-  const { writeOffs, addWriteOff } = useStore()
+  const { writeOffs, mutate } = useWriteOffs()
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const [location, setLocation] = useState<string>("")
+  const [store, setStore] = useState<Store | null>(null)
   const [photo, setPhoto] = useState<string | null>(null)
-  const [type, setType] = useState<WriteOffType>("no_deduction")
+  const [withDeduction, setWithDeduction] = useState(false)
+  const [person, setPerson] = useState<Person | null>(null)
+  const [reason, setReason] = useState("")
   const [comment, setComment] = useState("")
-  const [ingredients, setIngredients] = useState<Ingredient[]>([
-    { id: uid(), name: "", quantity: 1 },
-  ])
+  const [items, setItems] = useState<Ingredient[]>([{ id: uid(), name: "", quantity: 1 }])
+  const [submitting, setSubmitting] = useState(false)
 
-  const myHistory = writeOffs.filter((w) => w.submitted_by === STAFF_NAME)
+  // History scoped to the signed-in user is derived from the shared queue.
+  const myHistory = writeOffs
 
-  function updateIngredient(id: string, patch: Partial<Ingredient>) {
-    setIngredients((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
+  function updateItem(id: string, patch: Partial<Ingredient>) {
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
   }
 
   function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
@@ -53,33 +51,49 @@ export function LineStaffView() {
   }
 
   function reset() {
-    setLocation("")
+    setStore(null)
     setPhoto(null)
-    setType("no_deduction")
+    setWithDeduction(false)
+    setPerson(null)
+    setReason("")
     setComment("")
-    setIngredients([{ id: uid(), name: "", quantity: 1 }])
+    setItems([{ id: uid(), name: "", quantity: 1 }])
     if (fileRef.current) fileRef.current.value = ""
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const cleanIngredients = ingredients.filter((i) => i.name.trim().length > 0)
+    const cleanItems = items.filter((i) => i.name.trim().length > 0)
 
-    if (!location) return toast.error("Select a store location.")
-    if (cleanIngredients.length === 0) return toast.error("Add at least one ingredient.")
-    if (comment.trim().length < 10)
-      return toast.error("Comment must be at least 10 characters.")
+    if (!store) return toast.error("Search and select a store.")
+    if (!reason.trim()) return toast.error("Enter a write-off reason.")
+    if (cleanItems.length === 0) return toast.error("Add at least one item.")
+    if (comment.trim().length < 10) return toast.error("Comment must be at least 10 characters.")
+    if (withDeduction && !person)
+      return toast.error("Select the responsible person for the deduction.")
 
-    addWriteOff({
-      store_location: location,
-      photo,
-      write_off_type: type,
-      comment: comment.trim(),
-      ingredients: cleanIngredients,
-      submitted_by: STAFF_NAME,
-    })
-    toast.success("Write-off submitted for review.")
-    reset()
+    setSubmitting(true)
+    try {
+      await createWriteOff({
+        storeId: store.id,
+        storeName: store.name,
+        storeAddress: store.address,
+        reason: reason.trim(),
+        comment: comment.trim(),
+        withDeduction,
+        responsiblePersonId: withDeduction ? (person?.id ?? null) : null,
+        responsiblePersonName: withDeduction ? (person?.name ?? null) : null,
+        items: cleanItems,
+        photoDataUrl: photo,
+      })
+      await mutate()
+      toast.success("Write-off submitted for review.")
+      reset()
+    } catch {
+      toast.error("Could not submit. Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const commentValid = comment.trim().length >= 10
@@ -94,18 +108,17 @@ export function LineStaffView() {
           <form onSubmit={submit} className="space-y-5">
             <div className="space-y-2">
               <Label>Store location</Label>
-              <Select value={location} onValueChange={setLocation}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a store" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STORE_LOCATIONS.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <StorePicker value={store} onChange={setStore} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reason">Reason</Label>
+              <Input
+                id="reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g. Expired stock, damaged in transit"
+              />
             </div>
 
             <div className="space-y-2">
@@ -121,7 +134,11 @@ export function LineStaffView() {
               {photo ? (
                 <div className="relative overflow-hidden rounded-lg border border-border">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={photo || "/placeholder.svg"} alt="Write-off evidence preview" className="h-44 w-full object-cover" />
+                  <img
+                    src={photo || "/placeholder.svg"}
+                    alt="Write-off evidence preview"
+                    className="h-44 w-full object-cover"
+                  />
                   <button
                     type="button"
                     onClick={() => {
@@ -151,17 +168,20 @@ export function LineStaffView() {
               <div className="grid grid-cols-2 gap-2">
                 {(
                   [
-                    { value: "no_deduction", label: "No Deduction" },
-                    { value: "with_deduction", label: "With Deduction" },
+                    { value: false, label: "No Deduction" },
+                    { value: true, label: "With Deduction" },
                   ] as const
                 ).map((opt) => (
                   <button
-                    key={opt.value}
+                    key={String(opt.value)}
                     type="button"
-                    onClick={() => setType(opt.value)}
+                    onClick={() => {
+                      setWithDeduction(opt.value)
+                      if (!opt.value) setPerson(null)
+                    }}
                     className={
                       "rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors " +
-                      (type === opt.value
+                      (withDeduction === opt.value
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-border bg-card text-foreground hover:bg-accent")
                     }
@@ -172,30 +192,35 @@ export function LineStaffView() {
               </div>
             </div>
 
+            {withDeduction && (
+              <div className="space-y-2">
+                <Label className="text-destructive">Responsible person (required)</Label>
+                <PersonPicker value={person} onChange={setPerson} />
+              </div>
+            )}
+
             <Separator />
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>Ingredients</Label>
+                <Label>Items</Label>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   className="gap-1"
-                  onClick={() =>
-                    setIngredients((prev) => [...prev, { id: uid(), name: "", quantity: 1 }])
-                  }
+                  onClick={() => setItems((prev) => [...prev, { id: uid(), name: "", quantity: 1 }])}
                 >
                   <Plus className="size-4" />
                   Add
                 </Button>
               </div>
               <div className="space-y-2">
-                {ingredients.map((ing) => (
+                {items.map((ing) => (
                   <div key={ing.id} className="flex items-center gap-2">
                     <Input
                       value={ing.name}
-                      onChange={(e) => updateIngredient(ing.id, { name: e.target.value })}
+                      onChange={(e) => updateItem(ing.id, { name: e.target.value })}
                       placeholder="e.g. Beef patty"
                       className="flex-1"
                     />
@@ -204,7 +229,7 @@ export function LineStaffView() {
                       min={1}
                       value={ing.quantity}
                       onChange={(e) =>
-                        updateIngredient(ing.id, {
+                        updateItem(ing.id, {
                           quantity: Math.max(1, Number(e.target.value) || 1),
                         })
                       }
@@ -216,11 +241,11 @@ export function LineStaffView() {
                       variant="ghost"
                       size="icon"
                       onClick={() =>
-                        setIngredients((prev) =>
+                        setItems((prev) =>
                           prev.length > 1 ? prev.filter((i) => i.id !== ing.id) : prev,
                         )
                       }
-                      aria-label="Remove ingredient"
+                      aria-label="Remove item"
                       className="shrink-0 text-muted-foreground"
                     >
                       <Trash2 className="size-4" />
@@ -232,17 +257,15 @@ export function LineStaffView() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Comment</Label>
+                <Label htmlFor="comment">Comment</Label>
                 <span
-                  className={
-                    "text-xs " +
-                    (commentValid ? "text-muted-foreground" : "text-destructive")
-                  }
+                  className={"text-xs " + (commentValid ? "text-muted-foreground" : "text-destructive")}
                 >
                   {comment.trim().length}/10 min
                 </span>
               </div>
               <Textarea
+                id="comment"
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Describe what happened (minimum 10 characters)..."
@@ -250,8 +273,8 @@ export function LineStaffView() {
               />
             </div>
 
-            <Button type="submit" className="w-full">
-              Submit Write-Off
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? "Submitting..." : "Submit Write-Off"}
             </Button>
           </form>
         </CardContent>
@@ -263,21 +286,22 @@ export function LineStaffView() {
         </CardHeader>
         <CardContent>
           {myHistory.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No submissions yet.
-            </p>
+            <p className="py-6 text-center text-sm text-muted-foreground">No submissions yet.</p>
           ) : (
             <ul className="divide-y divide-border">
               {myHistory.map((w) => (
-                <li key={w.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                <li
+                  key={w.id}
+                  className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{w.store_location}</p>
+                    <p className="truncate text-sm font-medium text-foreground">{w.storeName}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {w.ingredients.map((i) => `-${i.quantity} ${i.name}`).join(", ")}
+                      {w.items.map((i) => `-${i.quantity} ${i.name}`).join(", ")}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {new Date(w.created_at).toLocaleDateString()} ·{" "}
-                      {w.write_off_type === "with_deduction" ? "With deduction" : "No deduction"}
+                      {new Date(w.createdAt).toLocaleDateString()} ·{" "}
+                      {w.withDeduction ? `Deduct: ${w.responsiblePersonName}` : "No deduction"}
                     </p>
                   </div>
                   <StatusBadge status={w.status} />
