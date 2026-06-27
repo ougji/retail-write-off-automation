@@ -167,9 +167,3 @@ Production checklist
 
 - Add a LICENSE file (e.g., MIT) if you want to publish under permissive terms.
 - Maintainers: open an issue or PR for changes and coordinate via GitHub issues.
-
----
-
-Note: I updated this README with a developer-focused guide. If you want, I can now:
-- Fetch package.json and other files to populate exact scripts and dependencies.
-- Add a short intro or architecture diagram (SVG/PNG) in the repo.
