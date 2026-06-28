@@ -9,7 +9,113 @@ import { StatusBadge } from "@/components/status-badge"
 import { useWriteOffs } from "@/lib/use-write-offs"
 import { decideWriteOff } from "@/app/actions/write-offs"
 import type { WriteOff } from "@/lib/types"
-import { Check, X, MapPin, TriangleAlert, DollarSign, ClipboardList, Inbox } from "lucide-react"
+import {
+  Check,
+  X,
+  MapPin,
+  TriangleAlert,
+  DollarSign,
+  ClipboardList,
+  Inbox,
+  Snowflake,
+  UserCog,
+  BarChart3,
+} from "lucide-react"
+
+interface SmartAlert {
+  id: string
+  icon: typeof Snowflake
+  title: string
+  detail: string
+  hint: string
+  tone: string
+}
+
+const SMART_ALERTS: SmartAlert[] = [
+  {
+    id: "buns",
+    icon: Snowflake,
+    title: "Green Plaza Aktau",
+    detail: "-42% burger buns anomaly spike",
+    hint: "Check freezer connection",
+    tone: "border-destructive/30 bg-destructive/5 text-destructive",
+  },
+  {
+    id: "shift",
+    icon: UserCog,
+    title: "Magnum Zhetysu Almaty",
+    detail: "70% of waste occurring under the same employee shift",
+    hint: "Review shift accountability",
+    tone: "border-chart-3/30 bg-chart-3/5 text-chart-3",
+  },
+]
+
+// Branch comparison data for the waste-expense bar chart (USD).
+const BRANCH_WASTE: { branch: string; value: number }[] = [
+  { branch: "Aktau", value: 1840 },
+  { branch: "Almaty", value: 2630 },
+  { branch: "Aktobe", value: 1210 },
+]
+
+function SmartAlerts() {
+  return (
+    <div>
+      <div className="mb-3 flex items-center gap-2">
+        <TriangleAlert className="size-4 text-chart-3" />
+        <h2 className="text-sm font-medium text-muted-foreground">Smart Alerts / Anomalies</h2>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {SMART_ALERTS.map((a) => (
+          <Card key={a.id} className={"border " + a.tone}>
+            <CardContent className="flex gap-3 py-4">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background/60">
+                <a.icon className="size-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">{a.title}</p>
+                <p className="mt-0.5 text-sm text-foreground/80">{a.detail}</p>
+                <p className="mt-1.5 text-xs font-medium opacity-90">{a.hint}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function BranchWasteChart() {
+  const max = Math.max(...BRANCH_WASTE.map((b) => b.value))
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <BarChart3 className="size-4 text-muted-foreground" />
+          Waste expenses by branch
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex h-52 items-end justify-around gap-4 sm:gap-8">
+          {BRANCH_WASTE.map((b) => {
+            const heightPct = Math.round((b.value / max) * 100)
+            return (
+              <div key={b.branch} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
+                <span className="text-xs font-semibold text-foreground">${b.value}</span>
+                <div className="flex w-full flex-1 items-end">
+                  <div
+                    className="w-full rounded-t-md bg-primary transition-all"
+                    style={{ height: `${heightPct}%` }}
+                  />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground">{b.branch}</span>
+              </div>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 function StatCard({
   icon: Icon,
@@ -131,6 +237,8 @@ export function ControlView() {
 
   return (
     <div className="space-y-6">
+      <SmartAlerts />
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatCard
           icon={DollarSign}
@@ -151,6 +259,8 @@ export function ControlView() {
           tone="bg-primary/15 text-primary"
         />
       </div>
+
+      <BranchWasteChart />
 
       <div>
         <div className="mb-3 flex items-center justify-between">
