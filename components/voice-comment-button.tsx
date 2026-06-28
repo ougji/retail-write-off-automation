@@ -10,22 +10,57 @@ interface VoiceCommentButtonProps {
 
 type RecognitionState = "idle" | "listening" | "error"
 
-export function VoiceCommentButton({ onTranscript, disabled }: VoiceCommentButtonProps) {
+// Stable reference to the SpeechRecognition constructor, resolved once.
+function getSpeechRecognition(): typeof SpeechRecognition | null {
+  if (typeof window === "undefined") return null
+  return (
+    (window as unknown as { SpeechRecognition?: typeof SpeechRecognition })
+      .SpeechRecognition ??
+    (
+      window as unknown as {
+        webkitSpeechRecognition?: typeof SpeechRecognition
+      }
+    ).webkitSpeechRecognition ??
+    null
+  )
+}
+
+export function VoiceCommentButton({
+  onTranscript,
+  disabled,
+}: VoiceCommentButtonProps) {
   const [state, setState] = useState<RecognitionState>("idle")
   const [unsupported, setUnsupported] = useState(false)
+
+  // Keep a stable ref to onTranscript so recognition handlers never go stale.
+  const onTranscriptRef = useRef(onTranscript)
+  useEffect(() => {
+    onTranscriptRef.current = onTranscript
+  })
+
+  // Intentionally stop flag — prevents auto-restart on manual stop.
+  const stoppingRef = useRef(false)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
 
   useEffect(() => {
-    const SpeechRecognition =
-      (window as typeof window & { SpeechRecognition?: typeof window.SpeechRecognition }).SpeechRecognition ||
-      (window as typeof window & { webkitSpeechRecognition?: typeof window.SpeechRecognition }).webkitSpeechRecognition
-    if (!SpeechRecognition) {
+    const SR = getSpeechRecognition()
+    if (!SR) {
       setUnsupported(true)
-      return
     }
+    // No instance created here — created fresh on each start() call.
+  }, [])
 
-    const recognition = new SpeechRecognition()
-    recognition.continuous = true
+  const startListening = useCallback(() => {
+    const SR = getSpeechRecognition()
+    if (!SR) return
+
+    stoppingRef.current = false
+
+    // Abort any existing session first.
+    recognitionRef.current?.abort()
+
+    const recognition = new SR()
+    recognition.continuous = false  // single-shot is most reliable cross-origin
     recognition.interimResults = false
     recognition.lang = "en-US"
 
@@ -37,45 +72,67 @@ export function VoiceCommentButton({ onTranscript, disabled }: VoiceCommentButto
         }
       }
       if (transcript.trim()) {
-        onTranscript(transcript.trim())
+        onTranscriptRef.current(transcript.trim())
       }
     }
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      if (event.error !== "aborted") {
-        setState("error")
-        setTimeout(() => setState("idle"), 2000)
+      // "aborted" fires when we call .abort() ourselves — ignore it.
+      if (event.error === "aborted") return
+      // "no-speech" is benign — just stop quietly.
+      if (event.error === "no-speech") {
+        setState("idle")
+        return
       }
+      setState("error")
+      setTimeout(() => setState("idle"), 2500)
     }
 
     recognition.onend = () => {
-      setState((prev) => (prev === "listening" ? "idle" : prev))
+      if (stoppingRef.current) {
+        // User pressed stop — settle to idle.
+        setState("idle")
+        return
+      }
+      // Auto-restart to mimic continuous listening.
+      // Re-check flag in case stop was pressed while onend was queued.
+      if (!stoppingRef.current) {
+        startListening()
+      }
     }
 
     recognitionRef.current = recognition
 
-    return () => {
-      recognition.abort()
+    try {
+      recognition.start()
+      setState("listening")
+    } catch {
+      setState("error")
+      setTimeout(() => setState("idle"), 2500)
     }
-  }, [onTranscript])
+  }, [])  // empty deps — stable because it only touches refs
+
+  const stopListening = useCallback(() => {
+    stoppingRef.current = true
+    recognitionRef.current?.stop()
+    setState("idle")
+  }, [])
 
   const toggle = useCallback(() => {
-    const recognition = recognitionRef.current
-    if (!recognition) return
-
     if (state === "listening") {
-      recognition.stop()
-      setState("idle")
+      stopListening()
     } else {
-      try {
-        recognition.start()
-        setState("listening")
-      } catch {
-        setState("error")
-        setTimeout(() => setState("idle"), 2000)
-      }
+      startListening()
     }
-  }, [state])
+  }, [state, startListening, stopListening])
+
+  // Clean up on unmount.
+  useEffect(() => {
+    return () => {
+      stoppingRef.current = true
+      recognitionRef.current?.abort()
+    }
+  }, [])
 
   if (unsupported) return null
 
@@ -87,10 +144,11 @@ export function VoiceCommentButton({ onTranscript, disabled }: VoiceCommentButto
       type="button"
       onClick={toggle}
       disabled={disabled}
-      aria-label={isListening ? "Stop recording" : "Start voice input"}
+      aria-label={isListening ? "Stop voice input" : "Start voice input"}
       aria-pressed={isListening}
       className={[
-        "relative flex items-center justify-center rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "relative flex items-center justify-center rounded-full transition-all duration-200",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         "size-12 shrink-0",
         isError
           ? "bg-destructive text-destructive-foreground shadow-md"
@@ -100,7 +158,6 @@ export function VoiceCommentButton({ onTranscript, disabled }: VoiceCommentButto
         disabled ? "opacity-40 cursor-not-allowed pointer-events-none" : "cursor-pointer",
       ].join(" ")}
     >
-      {/* Pulse ring when listening */}
       {isListening && (
         <>
           <span className="absolute inset-0 rounded-full bg-primary/30 animate-ping" />
