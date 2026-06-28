@@ -32,6 +32,7 @@ export function VoiceCommentButton({
   const [state, setState] = useState<RecognitionState>("idle")
   const [unsupported, setUnsupported] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [interimText, setInterimText] = useState("")
 
   // Keep a stable ref to onTranscript so recognition handlers never go stale.
   const onTranscriptRef = useRef(onTranscript)
@@ -64,19 +65,27 @@ export function VoiceCommentButton({
     recognitionRef.current?.abort()
 
     const recognition = new SR()
-    recognition.continuous = false // single-shot is most reliable cross-browser
-    recognition.interimResults = false
-    recognition.lang = "en-US"
+    recognition.continuous = true // keep the session open for lower latency
+    recognition.interimResults = true // surface words live as they're spoken
+    recognition.lang = "ru-RU" // распознавание русской речи
+    recognition.maxAlternatives = 1
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let transcript = ""
+      let finalTranscript = ""
+      let interim = ""
       for (let i = event.resultIndex; i < event.results.length; i++) {
+        const text = event.results[i][0].transcript
         if (event.results[i].isFinal) {
-          transcript += event.results[i][0].transcript
+          finalTranscript += text
+        } else {
+          interim += text
         }
       }
-      if (transcript.trim()) {
-        onTranscriptRef.current(transcript.trim())
+      // Show interim words instantly for a fast, responsive feel.
+      setInterimText(interim.trim())
+      if (finalTranscript.trim()) {
+        onTranscriptRef.current(finalTranscript.trim())
+        setInterimText("")
       }
     }
 
@@ -162,6 +171,7 @@ export function VoiceCommentButton({
     stoppingRef.current = true
     recognitionRef.current?.stop()
     setState("idle")
+    setInterimText("")
   }, [])
 
   const toggle = useCallback(() => {
@@ -195,10 +205,10 @@ export function VoiceCommentButton({
         aria-pressed={isListening}
         title={
           isListening
-            ? "Listening… tap to stop"
+            ? "Идёт запись… нажмите, чтобы остановить"
             : isError
-              ? message ?? "Voice input error"
-              : "Tap to dictate your comment"
+              ? message ?? "Ошибка голосового ввода"
+              : "Нажмите, чтобы продиктовать комментарий"
         }
         className={[
           "relative flex items-center justify-center rounded-full transition-all duration-200",
@@ -229,11 +239,17 @@ export function VoiceCommentButton({
       </button>
 
       <span className="sr-only" role="status" aria-live="polite">
-        {isListening ? "Listening" : message ?? ""}
+        {isListening ? "Идёт запись" : message ?? ""}
       </span>
 
+      {isListening && interimText && (
+        <p className="absolute top-full mt-1 w-48 text-center text-xs text-primary leading-snug italic">
+          {interimText}
+        </p>
+      )}
+
       {message && (
-        <p className="absolute top-full mt-1 w-44 text-center text-xs text-destructive leading-snug">
+        <p className="absolute top-full mt-1 w-48 text-center text-xs text-destructive leading-snug">
           {message}
         </p>
       )}
