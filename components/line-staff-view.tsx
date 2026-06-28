@@ -17,6 +17,7 @@ import type { Ingredient } from "@/lib/types"
 import type { Store } from "@/lib/stores"
 import type { Person } from "@/lib/people"
 import { ImagePlus, Plus, Trash2, X } from "lucide-react"
+import { VoiceCommentButton } from "@/components/voice-comment-button"
 
 function uid() {
   return Math.random().toString(36).slice(2, 10)
@@ -264,13 +265,27 @@ export function LineStaffView() {
                   {comment.trim().length}/10 min
                 </span>
               </div>
-              <Textarea
-                id="comment"
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Describe what happened (minimum 10 characters)..."
-                rows={3}
-              />
+              <div className="flex items-start gap-3">
+                <Textarea
+                  id="comment"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Describe what happened, or tap the mic to speak..."
+                  rows={3}
+                  className="flex-1"
+                />
+                <VoiceCommentButton
+                  onTranscript={(text) =>
+                    setComment((prev) =>
+                      prev.trim() ? `${prev.trim()} ${text}` : text,
+                    )
+                  }
+                  disabled={submitting}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Tap the mic to dictate your comment hands-free.
+              </p>
             </div>
 
             <Button type="submit" className="w-full" disabled={submitting}>
