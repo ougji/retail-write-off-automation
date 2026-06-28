@@ -1,9 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import {
@@ -13,15 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { BudgetTracker } from "@/components/budget-tracker"
 import { useWriteOffs } from "@/lib/use-write-offs"
+import { useExpenses } from "@/lib/use-expenses"
 import { verifyWriteOff } from "@/app/actions/write-offs"
 import type { WriteOff } from "@/lib/types"
-import { CheckCheck, MapPin, Inbox, User, Wallet } from "lucide-react"
+import { CheckCheck, MapPin, Inbox, User } from "lucide-react"
 
 const VERIFY_REASONS = ["Expired", "Equipment Failure (Fridge)", "Staff Error"] as const
-
-// Weekly waste budget allotted per store (USD).
-const WEEKLY_BUDGET = 500
 
 function PendingCard({ writeOff, onDone }: { writeOff: WriteOff; onDone: () => void }) {
   const [busy, setBusy] = useState(false)
@@ -137,113 +136,19 @@ function PendingCard({ writeOff, onDone }: { writeOff: WriteOff; onDone: () => v
   )
 }
 
-function isThisWeek(iso: string) {
-  const d = new Date(iso)
-  const now = new Date()
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-  return d >= weekAgo && d <= now
-}
-
-function BudgetTracker({ writeOffs }: { writeOffs: WriteOff[] }) {
-  const stores = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const w of writeOffs) map.set(w.storeId, w.storeName)
-    return Array.from(map, ([id, name]) => ({ id, name }))
-  }, [writeOffs])
-
-  const [storeId, setStoreId] = useState<string>("")
-  const activeStoreId = storeId || stores[0]?.id || ""
-
-  const spent = useMemo(
-    () =>
-      writeOffs
-        .filter(
-          (w) =>
-            w.storeId === activeStoreId &&
-            w.status !== "rejected" &&
-            isThisWeek(w.createdAt),
-        )
-        .reduce((s, w) => s + w.totalValue, 0),
-    [writeOffs, activeStoreId],
-  )
-
-  if (stores.length === 0) return null
-
-  const pct = Math.min(100, Math.round((spent / WEEKLY_BUDGET) * 100))
-  const over = spent > WEEKLY_BUDGET
-  const barTone = over
-    ? "bg-destructive"
-    : pct >= 80
-      ? "bg-chart-3"
-      : "bg-primary"
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Wallet className="size-4 text-muted-foreground" />
-          Weekly waste budget
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <Select value={activeStoreId} onValueChange={(v) => setStoreId(v ?? "")}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select store..." />
-          </SelectTrigger>
-          <SelectContent>
-            {stores.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div className="space-y-2">
-          <div className="flex items-baseline justify-between text-sm">
-            <span className="font-medium text-foreground">
-              ${spent.toFixed(0)}{" "}
-              <span className="text-muted-foreground">/ ${WEEKLY_BUDGET}</span>
-            </span>
-            <span
-              className={
-                "text-xs font-medium " +
-                (over ? "text-destructive" : pct >= 80 ? "text-chart-3" : "text-muted-foreground")
-              }
-            >
-              {pct}% used
-            </span>
-          </div>
-          <div
-            className="h-2.5 w-full overflow-hidden rounded-full bg-muted"
-            role="progressbar"
-            aria-valuenow={pct}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          >
-            <div
-              className={"h-full rounded-full transition-all " + barTone}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          {over && (
-            <p className="text-xs font-medium text-destructive">
-              Over budget by ${(spent - WEEKLY_BUDGET).toFixed(0)} this week.
-            </p>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 export function SupervisorView() {
   const { writeOffs, mutate } = useWriteOffs()
+  const { expenses, mutate: mutateExpenses } = useExpenses()
   const pending = writeOffs.filter((w) => w.status === "pending")
 
   return (
     <div className="space-y-6">
-      <BudgetTracker writeOffs={writeOffs} />
+      <BudgetTracker
+        writeOffs={writeOffs}
+        expenses={expenses}
+        canAddExpense
+        onExpenseAdded={mutateExpenses}
+      />
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">

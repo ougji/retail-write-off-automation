@@ -29,6 +29,18 @@ export interface WriteOff {
   createdAt: string
 }
 
+export interface Expense {
+  id: string
+  userId: string
+  submitterName: string
+  storeId: string
+  storeName: string
+  city: string
+  amount: number
+  note: string
+  createdAt: string
+}
+
 export const ROLES: { value: Role; label: string; subtitle: string }[] = [
   { value: "line_staff", label: "Line Staff", subtitle: "Cashier / Chef" },
   { value: "supervisor", label: "Supervisor", subtitle: "Store Manager" },

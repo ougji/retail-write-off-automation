@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/status-badge"
+import { BudgetTracker } from "@/components/budget-tracker"
 import { useWriteOffs } from "@/lib/use-write-offs"
+import { useExpenses } from "@/lib/use-expenses"
 import { decideWriteOff } from "@/app/actions/write-offs"
-import type { WriteOff } from "@/lib/types"
+import { STORES } from "@/lib/stores"
+import type { Expense, WriteOff } from "@/lib/types"
 import {
   Check,
   X,
@@ -50,12 +53,7 @@ const SMART_ALERTS: SmartAlert[] = [
   },
 ]
 
-// Branch comparison data for the waste-expense bar chart (USD).
-const BRANCH_WASTE: { branch: string; value: number }[] = [
-  { branch: "Aktau", value: 1840 },
-  { branch: "Almaty", value: 2630 },
-  { branch: "Aktobe", value: 1210 },
-]
+const STORE_CITY = new Map(STORES.map((s) => [s.id, s.city]))
 
 function SmartAlerts() {
   return (
@@ -84,8 +82,30 @@ function SmartAlerts() {
   )
 }
 
-function BranchWasteChart() {
-  const max = Math.max(...BRANCH_WASTE.map((b) => b.value))
+function BranchWasteChart({
+  writeOffs,
+  expenses,
+}: {
+  writeOffs: WriteOff[]
+  expenses: Expense[]
+}) {
+  // Aggregate real waste value + logged expenses per branch (city).
+  const totals = new Map<string, number>()
+  for (const w of writeOffs) {
+    if (w.status === "rejected") continue
+    const city = STORE_CITY.get(w.storeId) ?? "Other"
+    totals.set(city, (totals.get(city) ?? 0) + w.totalValue)
+  }
+  for (const e of expenses) {
+    const city = e.city || STORE_CITY.get(e.storeId) || "Other"
+    totals.set(city, (totals.get(city) ?? 0) + e.amount)
+  }
+
+  const branches = Array.from(totals, ([branch, value]) => ({ branch, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6)
+  const max = Math.max(1, ...branches.map((b) => b.value))
+
   return (
     <Card>
       <CardHeader>
@@ -95,23 +115,34 @@ function BranchWasteChart() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex h-52 items-end justify-around gap-4 sm:gap-8">
-          {BRANCH_WASTE.map((b) => {
-            const heightPct = Math.round((b.value / max) * 100)
-            return (
-              <div key={b.branch} className="flex h-full flex-1 flex-col items-center justify-end gap-2">
-                <span className="text-xs font-semibold text-foreground">${b.value}</span>
-                <div className="flex w-full flex-1 items-end">
-                  <div
-                    className="w-full rounded-t-md bg-primary transition-all"
-                    style={{ height: `${heightPct}%` }}
-                  />
+        {branches.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            No waste data recorded yet.
+          </p>
+        ) : (
+          <div className="flex h-52 items-end justify-around gap-3 sm:gap-6">
+            {branches.map((b) => {
+              const heightPct = Math.max(4, Math.round((b.value / max) * 100))
+              return (
+                <div
+                  key={b.branch}
+                  className="flex h-full flex-1 flex-col items-center justify-end gap-2"
+                >
+                  <span className="text-xs font-semibold text-foreground">${b.value.toFixed(0)}</span>
+                  <div className="flex w-full flex-1 items-end">
+                    <div
+                      className="w-full rounded-t-md bg-primary transition-all"
+                      style={{ height: `${heightPct}%` }}
+                    />
+                  </div>
+                  <span className="max-w-full truncate text-xs font-medium text-muted-foreground">
+                    {b.branch}
+                  </span>
                 </div>
-                <span className="text-xs font-medium text-muted-foreground">{b.branch}</span>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -225,6 +256,7 @@ function VerifiedCard({ writeOff, onDone }: { writeOff: WriteOff; onDone: () => 
 
 export function ControlView() {
   const { writeOffs, mutate } = useWriteOffs()
+  const { expenses } = useExpenses()
   const verified = writeOffs.filter((w) => w.status === "verified")
 
   const totalWaste = writeOffs
@@ -260,7 +292,9 @@ export function ControlView() {
         />
       </div>
 
-      <BranchWasteChart />
+      <BudgetTracker writeOffs={writeOffs} expenses={expenses} />
+
+      <BranchWasteChart writeOffs={writeOffs} expenses={expenses} />
 
       <div>
         <div className="mb-3 flex items-center justify-between">

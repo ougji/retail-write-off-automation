@@ -77,3 +77,16 @@ export const writeOff = pgTable("write_off", {
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 })
+
+// Manually logged waste expenses that roll up into the weekly budget.
+export const expense = pgTable("expense", {
+  id: text("id").primaryKey(),
+  userId: text("userId").notNull(),
+  submitterName: text("submitterName").notNull(),
+  storeId: text("storeId").notNull(),
+  storeName: text("storeName").notNull(),
+  city: text("city").notNull().default(""),
+  amount: numeric("amount").notNull().default("0"),
+  note: text("note").notNull().default(""),
+  createdAt: timestamp("createdAt").notNull().defaultNow(),
+})
